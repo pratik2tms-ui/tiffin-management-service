@@ -1,0 +1,47 @@
+# ============================================================
+# Tiffin Manager — Backend .gitignore
+# ============================================================
+
+# ── Environment & secrets ───────────────────────────────────
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# ── Dependencies ────────────────────────────────────────────
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ── Logs ────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Build output ────────────────────────────────────────────
+dist/
+build/
+
+# ── OS files ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ── Testing ─────────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ── Sequelize ───────────────────────────────────────────────
+.sequelizerc.backup
