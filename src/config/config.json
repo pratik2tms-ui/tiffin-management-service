@@ -17,8 +17,8 @@
     "test": {
         "username": "postgres",
         "password": "TMS_Testing@1234",
-        "database": "tiffin_db_test",
-        "host": "localhost",
+        "database": "postgres",
+        "host": "db.hufitrdeexdzctayvgws.supabase.co",
         "port": 5432,
         "dialect": "postgres",
         "logging": false,
