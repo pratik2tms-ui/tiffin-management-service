@@ -15,11 +15,11 @@
         }
     },
     "test": {
-        "username": "postgres",
+        "username": "postgres.hufitrdeexdzctayvgws",
         "password": "TMS_Testing@1234",
         "database": "postgres",
-        "host": "db.hufitrdeexdzctayvgws.supabase.co",
-        "port": 5432,
+        "host": "aws-1-ap-southeast-1.pooler.supabase.com",
+        "port": 6543,
         "dialect": "postgres",
         "logging": false,
         "pool": {
