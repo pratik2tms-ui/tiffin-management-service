@@ -7,6 +7,10 @@
         "port": 5432,
         "dialect": "postgres",
         "logging": true,
+        "frontendUrl": "http://localhost:5173",
+        "encryptionEnabled": false,
+        "JWT_SECRET": "ea24f8e9e444c9fab0fb378c2a6f9704d0e294ffc6a0f186dd61990a8cecefcb",
+        "JWT_EXPIRES_IN": "7d",
         "pool": {
             "max": 10,
             "min": 0,
@@ -22,6 +26,10 @@
         "port": 6543,
         "dialect": "postgres",
         "logging": false,
+        "frontendUrl": "http://tiffin-management-system-alpha.vercel.app",
+        "encryptionEnabled": false,
+        "JWT_SECRET": "504bb0d422a6182362849a790f6b5da8019c06d2b9724785bdaa0f960ab991b6f0b6abc065f0901b8b9d86be88452c8c7f680c5f41154dc16a282229091bbae1",
+        "JWT_EXPIRES_IN": "7d",
         "pool": {
             "max": 5,
             "min": 0,
@@ -43,6 +51,10 @@
                 "rejectUnauthorized": false
             }
         },
+        "frontendUrl": "http://localhost:5173",
+        "encryptionEnabled": false,
+        "JWT_SECRET": "504bb0d422a6182362849a790f6b5da8019c06d2b9724785bdaa0f960ab991b6f0b6abc065f0901b8b9d86be88452c8c7f680c5f41154dc16a282229091bbae1",
+        "JWT_EXPIRES_IN": "7d",
         "pool": {
             "max": 20,
             "min": 5,

@@ -2,18 +2,30 @@ const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
 const morgan = require('morgan')
+const corsOptions = require('./cors')
 const { decryptRequest, encryptResponse } = require('../middleware/encryption.middleware')
 
 const createApp = () => {
     const app = express()
 
-    app.use(helmet())
-    app.use(cors())
-    app.use(morgan('dev'))
+    // Security
+    app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
+
+    // CORS — must come before routes
+    app.use(cors(corsOptions)) // handle preflight for all routes
+
+    // Logging
+    if (process.env.NODE_ENV !== 'production') {
+        app.use(morgan('dev'))
+    } else {
+        app.use(morgan('combined'))
+    }
+
+    // Body parsing
     app.use(express.json())
     app.use(express.urlencoded({ extended: true }))
 
-    // Encryption middleware — applies globally, controlled by ENCRYPTION_ENABLED flag
+    // Encryption middleware
     app.use(decryptRequest)
     app.use(encryptResponse)
 

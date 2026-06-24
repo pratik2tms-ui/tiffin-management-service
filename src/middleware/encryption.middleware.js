@@ -1,19 +1,19 @@
-// Base64 encode/decode middleware for request/response body
-// Controlled by ENCRYPTION_ENABLED in .env — set to 'true' for production-like testing
+const env = process.env.NODE_ENV || 'development'
+const config = require('../config/config.json')[env]
 
-const isEncryptionEnabled = () => process.env.ENCRYPTION_ENABLED === 'true'
+const isEncryptionEnabled = () => config.encryptionEnabled === true
 
-// Decrypt incoming request body: { data: "base64string" } → actual JSON
 const decryptRequest = (req, res, next) => {
     if (!isEncryptionEnabled()) return next()
-
-    // No body to decrypt (GET requests etc.)
     if (!req.body || Object.keys(req.body).length === 0) return next()
 
     if (!req.body.data) {
         return res.status(400).json({
             success: false,
-            error: { code: 'ENCRYPTION_REQUIRED', message: 'Request body must be { "data": "<base64>" } when encryption is enabled' },
+            error: {
+                code: 'ENCRYPTION_REQUIRED',
+                message: 'Request body must be { "data": "<base64>" } when encryption is enabled',
+            },
         })
     }
 
@@ -29,7 +29,6 @@ const decryptRequest = (req, res, next) => {
     }
 }
 
-// Encrypt outgoing response body: actual JSON → { data: "base64string" }
 const encryptResponse = (req, res, next) => {
     if (!isEncryptionEnabled()) return next()
 
