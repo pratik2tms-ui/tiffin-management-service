@@ -26,7 +26,7 @@
         "port": 6543,
         "dialect": "postgres",
         "logging": false,
-        "frontendUrl": "http://tiffin-management-system-alpha.vercel.app",
+        "frontendUrl": "https://tiffin-management-system-alpha.vercel.app",
         "encryptionEnabled": false,
         "JWT_SECRET": "504bb0d422a6182362849a790f6b5da8019c06d2b9724785bdaa0f960ab991b6f0b6abc065f0901b8b9d86be88452c8c7f680c5f41154dc16a282229091bbae1",
         "JWT_EXPIRES_IN": "7d",
