@@ -1,7 +1,6 @@
 const env = process.env.NODE_ENV || 'development'
 const config = require('./config.json')[env]
 
-// Define origins first — before corsOptions references them
 const getAllowedOrigins = () => {
     const base = [config.frontendUrl].filter(Boolean)
 
@@ -19,11 +18,10 @@ const getAllowedOrigins = () => {
         return [
             ...base,
             'http://localhost:5173',
-            'https://tiffin-management-system-alpha.vercel.app',  // ← your Vercel URL
+            'https://tiffin-management-system-alpha.vercel.app',
         ]
     }
 
-    // production
     return base
 }
 
@@ -31,10 +29,15 @@ const corsOptions = {
     origin: (origin, callback) => {
         const allowed = getAllowedOrigins()
 
-        // Allow no-origin requests (Postman, curl, mobile)
-        if (!origin) return callback(null, true)
+        // Allow Postman, curl, mobile apps
+        if (!origin) {
+            return callback(null, true)
+        }
 
-        if (allowed.includes(origin)) {
+        const isVercelPreview =
+            /^https:\/\/tiffin-management-system.*\.vercel\.app$/.test(origin)
+
+        if (allowed.includes(origin) || isVercelPreview) {
             return callback(null, true)
         }
 
