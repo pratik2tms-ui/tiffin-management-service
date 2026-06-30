@@ -1,16 +1,30 @@
 const { TiffinEntry, Approval } = require('../models')
 const ServiceError = require('../utils/ServiceError')
 
-const getPendingApprovals = async ({ centerId }) => {
+const getPendingApprovals = async ({ centerId, page = 1, limit = 10 }) => {
     if (!centerId) {
         throw new ServiceError('VALIDATION_ERROR', 'centerId is required', 400)
     }
     const { User } = require('../models')
-    return TiffinEntry.findAll({
+
+    const offset = (page - 1) * limit
+    const { rows, count } = await TiffinEntry.findAndCountAll({
         where: { centerId, status: 'pending', isDeleted: false },
         include: [{ model: User, as: 'user', attributes: ['id', 'name'] }],
         order: [['entryDate', 'ASC']],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
     })
+
+    return {
+        data: rows,
+        pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: count,
+            totalPages: Math.ceil(count / limit),
+        },
+    }
 }
 
 const reviewEntry = async ({ entryId, action, reason, requester }) => {
