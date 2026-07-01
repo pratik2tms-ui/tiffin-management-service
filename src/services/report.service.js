@@ -174,69 +174,89 @@ const getCustomerHistory = async ({ userId, months = 6 }) => {
     }
 
     const userIdInt = parseInt(userId, 10)
-    const results = []
+    if (isNaN(userIdInt)) {
+        throw new ServiceError('VALIDATION_ERROR', 'userId must be a valid number', 400)
+    }
 
-    const now = new Date()
-    for (let i = months - 1; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const y = d.getFullYear()
-        const m = d.getMonth() + 1
-        const start = `${y}-${String(m).padStart(2, '0')}-01`
-        const end = new Date(y, m, 0).toISOString().split('T')[0]
+    const defaultResponse = {
+        months: [],
+        typeBreakdown: [],
+    }
 
-        const entries = await TiffinEntry.findAll({
+    try {
+        const results = []
+        const now = new Date()
+
+        for (let i = months - 1; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const y = d.getFullYear()
+            const m = d.getMonth() + 1
+            const start = `${y}-${String(m).padStart(2, '0')}-01`
+            const end = new Date(y, m, 0).toISOString().split('T')[0]
+
+            const entries = await TiffinEntry.findAll({
+                where: {
+                    userId: userIdInt,
+                    entryDate: { [Op.between]: [start, end] },
+                    status: 'approved',
+                    isNoTiffin: false,
+                    isDeleted: false,
+                },
+            })
+
+            const count = entries.length
+            const amount = entries.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+
+            results.push({
+                month: m,
+                year: y,
+                label: d.toLocaleString('en-IN', { month: 'short' }),
+                count,
+                amount: parseFloat(amount.toFixed(2)),
+            })
+        }
+
+        if (!results.length) return defaultResponse
+
+        const rangeStart = `${results[0].year}-${String(results[0].month).padStart(2, '0')}-01`
+        const lastResult = results[results.length - 1]
+        const rangeEnd = new Date(lastResult.year, lastResult.month, 0).toISOString().split('T')[0]
+
+        const allEntries = await TiffinEntry.findAll({
             where: {
                 userId: userIdInt,
-                entryDate: { [Op.between]: [start, end] },
+                entryDate: { [Op.between]: [rangeStart, rangeEnd] },
                 status: 'approved',
                 isNoTiffin: false,
                 isDeleted: false,
             },
         })
 
-        const count = entries.length
-        const amount = entries.reduce((s, e) => s + parseFloat(e.amount), 0)
+        let typeBreakdown = []
 
-        results.push({
-            month: m,
-            year: y,
-            label: d.toLocaleString('en-IN', { month: 'short' }),
-            count,
-            amount,
-        })
+        if (allEntries.length > 0) {
+            const typeCounts = {}
+            allEntries.forEach(e => {
+                if (e.tiffinType) {
+                    typeCounts[e.tiffinType] = (typeCounts[e.tiffinType] || 0) + 1
+                }
+            })
+
+            typeBreakdown = Object.entries(typeCounts)
+                .map(([type, count]) => ({
+                    type,
+                    count,
+                    percentage: Math.round((count / allEntries.length) * 100),
+                }))
+                .sort((a, b) => b.count - a.count)
+        }
+
+        return { months: results, typeBreakdown }
+
+    } catch (err) {
+        console.error('[getCustomerHistory] Error:', err)
+        return defaultResponse
     }
-
-    // Favourite type — across all months in range
-    const rangeStart = results[0]
-        ? `${results[0].year}-${String(results[0].month).padStart(2, '0')}-01`
-        : null
-    const lastResult = results[results.length - 1]
-    const rangeEnd = lastResult
-        ? new Date(lastResult.year, lastResult.month, 0).toISOString().split('T')[0]
-        : null
-
-    const allEntries = await TiffinEntry.findAll({
-        where: {
-            userId: userIdInt,
-            entryDate: { [Op.between]: [rangeStart, rangeEnd] },
-            status: 'approved',
-            isNoTiffin: false,
-            isDeleted: false,
-        },
-    })
-
-    const typeCounts = {}
-    allEntries.forEach(e => {
-        typeCounts[e.tiffinType] = (typeCounts[e.tiffinType] || 0) + 1
-    })
-
-    const typeBreakdown = Object.entries(typeCounts).map(([type, count]) => ({
-        type,
-        count,
-        percentage: allEntries.length ? Math.round((count / allEntries.length) * 100) : 0,
-    })).sort((a, b) => b.count - a.count)
-
-    return { months: results, typeBreakdown }
 }
 
 const getCenterTypeBreakdown = async ({ centerId, month }) => {
@@ -245,37 +265,66 @@ const getCenterTypeBreakdown = async ({ centerId, month }) => {
     }
 
     const centerIdInt = parseInt(centerId, 10)
-    const dateRange = getMonthRange(month)
+    if (isNaN(centerIdInt)) {
+        throw new ServiceError('VALIDATION_ERROR', 'centerId must be a valid number', 400)
+    }
 
-    const entries = await TiffinEntry.findAll({
-        where: {
-            centerId: centerIdInt,
-            entryDate: dateRange,
-            status: 'approved',
-            isNoTiffin: false,
-            isDeleted: false,
-        },
-    })
+    const defaultResponse = {
+        breakdown: [],
+        totalCount: 0,
+        totalAmount: 0,
+    }
 
-    const TIFFIN_TYPES = ['full', 'half', 'chapati', 'bhakari', 'dalrice']
-    const breakdown = TIFFIN_TYPES.map(type => {
-        const typeEntries = entries.filter(e => e.tiffinType === type)
-        return {
-            type,
-            count: typeEntries.length,
-            amount: typeEntries.reduce((s, e) => s + parseFloat(e.amount), 0),
-        }
-    }).filter(t => t.count > 0)   // only types actually ordered
+    try {
+        const dateRange = getMonthRange(month)
 
-    const totalCount = breakdown.reduce((s, t) => s + t.count, 0)
-    const totalAmount = breakdown.reduce((s, t) => s + t.amount, 0)
+        const entries = await TiffinEntry.findAll({
+            where: {
+                centerId: centerIdInt,
+                entryDate: dateRange,
+                status: 'approved',
+                isNoTiffin: false,
+                isDeleted: false,
+            },
+        })
 
-    const withPercentage = breakdown.map(t => ({
-        ...t,
-        percentage: totalCount ? Math.round((t.count / totalCount) * 100) : 0,
-    })).sort((a, b) => b.count - a.count)
+        if (!entries.length) return defaultResponse
 
-    return { breakdown: withPercentage, totalCount, totalAmount }
+        const TIFFIN_TYPES = ['full', 'half', 'chapati', 'bhakari', 'dalrice']
+
+        const breakdown = TIFFIN_TYPES
+            .map(type => {
+                const typeEntries = entries.filter(e => e.tiffinType === type)
+                return {
+                    type,
+                    count: typeEntries.length,
+                    amount: parseFloat(
+                        typeEntries.reduce((s, e) => s + parseFloat(e.amount || 0), 0).toFixed(2)
+                    ),
+                }
+            })
+            .filter(t => t.count > 0)
+
+        if (!breakdown.length) return defaultResponse
+
+        const totalCount = breakdown.reduce((s, t) => s + t.count, 0)
+        const totalAmount = parseFloat(
+            breakdown.reduce((s, t) => s + t.amount, 0).toFixed(2)
+        )
+
+        const withPercentage = breakdown
+            .map(t => ({
+                ...t,
+                percentage: totalCount ? Math.round((t.count / totalCount) * 100) : 0,
+            }))
+            .sort((a, b) => b.count - a.count)
+
+        return { breakdown: withPercentage, totalCount, totalAmount }
+
+    } catch (err) {
+        console.error('[getCenterTypeBreakdown] Error:', err)
+        return defaultResponse
+    }
 }
 
 module.exports = { getDashboard, getBillingReport, getCustomerHistory, getCenterTypeBreakdown }
