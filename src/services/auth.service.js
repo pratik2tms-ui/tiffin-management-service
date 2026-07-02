@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs')
-const { User } = require('../models')
+const { User, TiffinCenter } = require('../models')
 const { generateToken } = require('../utils/jwt')
 const ServiceError = require('../utils/ServiceError')
 
@@ -22,12 +22,29 @@ const loginUser = async ({ username, password }) => {
         throw new ServiceError('ACCOUNT_INACTIVE', 'This account has been deactivated', 403)
     }
 
+    // For center role — resolve centerId from TiffinCenter using ownerId
+    let centerId = user.centerId
+
+    if (user.role === 'center') {
+        const center = await TiffinCenter.findOne({
+            where: { owner_id: user.id, is_deleted: false },
+            attributes: ['id'],
+            raw: true,
+        })
+
+        if (!center) {
+            throw new ServiceError('NOT_FOUND', 'No tiffin center found for this account', 404)
+        }
+
+        centerId = center.id
+    }
+
     const token = generateToken({
         id: user.id,
         uuid: user.uuid,
         username: user.username,
         role: user.role,
-        centerId: user.centerId,
+        centerId,
     })
 
     return {
@@ -38,7 +55,7 @@ const loginUser = async ({ username, password }) => {
             name: user.name,
             username: user.username,
             role: user.role,
-            centerId: user.centerId,
+            centerId,
             avatar: user.avatar,
         },
     }
