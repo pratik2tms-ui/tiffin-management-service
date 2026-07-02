@@ -1,5 +1,6 @@
-const { TiffinEntry, TiffinCenter, User } = require('../models')
+const { TiffinEntry, TiffinCenter, Pricing, User } = require('../models')
 const { Op } = require('sequelize')
+const ServiceError = require('../utils/ServiceError')
 
 const getMonthRange = (month) => {
     const targetMonth = month || new Date().toISOString().slice(0, 7)
@@ -86,7 +87,6 @@ const getBillingReport = async ({ centerId, month, userId, status }) => {
     const { Op } = require('sequelize')
 
     if (!centerId || !month) {
-        const ServiceError = require('../utils/ServiceError')
         throw new ServiceError('VALIDATION_ERROR', 'centerId and month are required', 400)
     }
 
@@ -269,14 +269,33 @@ const getCenterTypeBreakdown = async ({ centerId, month }) => {
         throw new ServiceError('VALIDATION_ERROR', 'centerId must be a valid number', 400)
     }
 
-    const defaultResponse = {
-        breakdown: [],
-        totalCount: 0,
-        totalAmount: 0,
+    const center = await TiffinCenter.findByPk(centerIdInt)
+    if (!center) {
+        throw new ServiceError('NOT_FOUND', 'Tiffin center not found', 404)
     }
+
+    const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
 
     try {
         const dateRange = getMonthRange(month)
+
+        const pricingRows = await Pricing.findAll({
+            where: { centerId, isActive: true, isDeleted: false, effectiveTo: null },
+        })
+
+        const pricingTypes = [...new Set(
+            pricingRows
+                .map(p => p.tiffinType || p.tiffin_type)
+                .filter(Boolean)
+        )]
+
+        const buildDefault = (types) => ({
+            breakdown: types.map(type => ({ type: capitalize(type), count: 0, amount: 0, percentage: 0 })),
+            totalCount: 0,
+            totalAmount: 0,
+        })
+
+        if (!pricingTypes.length) return buildDefault([])
 
         const entries = await TiffinEntry.findAll({
             where: {
@@ -288,42 +307,32 @@ const getCenterTypeBreakdown = async ({ centerId, month }) => {
             },
         })
 
-        if (!entries.length) return defaultResponse
+        if (!entries.length) return buildDefault(pricingTypes)
 
-        const TIFFIN_TYPES = ['full', 'half', 'chapati', 'bhakari', 'dalrice']
+        const totalCount = entries.length
+        const totalAmount = parseFloat(
+            entries.reduce((s, e) => s + parseFloat(e.amount || 0), 0).toFixed(2)
+        )
 
-        const breakdown = TIFFIN_TYPES
+        const breakdown = pricingTypes
             .map(type => {
                 const typeEntries = entries.filter(e => e.tiffinType === type)
                 return {
-                    type,
+                    type: capitalize(type),
                     count: typeEntries.length,
                     amount: parseFloat(
                         typeEntries.reduce((s, e) => s + parseFloat(e.amount || 0), 0).toFixed(2)
                     ),
+                    percentage: Math.round((typeEntries.length / totalCount) * 100),
                 }
             })
-            .filter(t => t.count > 0)
-
-        if (!breakdown.length) return defaultResponse
-
-        const totalCount = breakdown.reduce((s, t) => s + t.count, 0)
-        const totalAmount = parseFloat(
-            breakdown.reduce((s, t) => s + t.amount, 0).toFixed(2)
-        )
-
-        const withPercentage = breakdown
-            .map(t => ({
-                ...t,
-                percentage: totalCount ? Math.round((t.count / totalCount) * 100) : 0,
-            }))
             .sort((a, b) => b.count - a.count)
 
-        return { breakdown: withPercentage, totalCount, totalAmount }
+        return { breakdown, totalCount, totalAmount }
 
     } catch (err) {
         console.error('[getCenterTypeBreakdown] Error:', err)
-        return defaultResponse
+        return { breakdown: [], totalCount: 0, totalAmount: 0 }
     }
 }
 
