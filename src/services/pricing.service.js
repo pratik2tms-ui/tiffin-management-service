@@ -1,8 +1,6 @@
 const { Pricing, TiffinCenter } = require('../models')
 const ServiceError = require('../utils/ServiceError')
 
-const TIFFIN_TYPES = ['full', 'half', 'chapati', 'bhakari', 'dalrice']
-
 const getActivePricing = async ({ centerId }) => {
     if (!centerId) {
         throw new ServiceError('VALIDATION_ERROR', 'centerId is required', 400)
@@ -21,11 +19,11 @@ const getActivePricing = async ({ centerId }) => {
         throw new ServiceError('NOT_FOUND', 'No active pricing found for this center', 404)
     }
 
-    // Reshape into { full: {...}, half: {...}, ... } to match frontend mock shape
     const result = {}
     rows.forEach(row => {
         result[row.tiffinType] = {
             id: row.id,
+            name: row.tiffinType.charAt(0).toUpperCase() + row.tiffinType.slice(1),
             basePrice: parseFloat(row.basePrice),
             defaultChapati: row.defaultChapati,
             pricePerChapati: parseFloat(row.pricePerChapati),
@@ -49,30 +47,45 @@ const updatePricing = async ({ centerId, prices, requester }) => {
         throw new ServiceError('NOT_FOUND', 'Tiffin center not found', 404)
     }
 
+    // Fetch valid tiffin types for this center from pricing table
+    const existingPricingRows = await Pricing.findAll({
+        where: { centerId, isActive: true, isDeleted: false, effectiveTo: null },
+        attributes: ['tiffinType'],
+        raw: true,
+    })
+
+    const validTypes = new Set(
+        existingPricingRows.map(r => r.tiffinType || r.tiffin_type).filter(Boolean)
+    )
+
     const today = new Date().toISOString().split('T')[0]
     const updatedTypes = []
 
-    for (const type of TIFFIN_TYPES) {
+    // Iterate over what the frontend sent, not a hardcoded list
+    for (const type of Object.keys(prices)) {
         const incoming = prices[type]
         if (!incoming) continue
 
-        // Check if a row for this exact (center, type, today) already exists
+        // Skip types not configured for this center
+        if (validTypes.size > 0 && !validTypes.has(type)) {
+            console.warn(`[updatePricing] Skipping unknown type "${type}" for center ${centerId}`)
+            continue
+        }
+
         const existingToday = await Pricing.findOne({
             where: { centerId, tiffinType: type, effectiveFrom: today, isDeleted: false },
         })
 
         if (existingToday) {
-            // Same-day update — overwrite the row instead of inserting a duplicate
             existingToday.basePrice = incoming.basePrice
             existingToday.defaultChapati = incoming.defaultChapati || 0
             existingToday.pricePerChapati = incoming.pricePerChapati ?? 5.00
-            existingToday.isFixedPrice = type === 'dalrice' ? true : !!incoming.isFixedPrice
+            existingToday.isFixedPrice = !!incoming.isFixedPrice
             existingToday.isActive = true
             existingToday.effectiveTo = null
             existingToday.modifiedBy = requester.id
             await existingToday.save()
         } else {
-            // First update today — close yesterday's (or earlier) active row, insert new one
             await Pricing.update(
                 { effectiveTo: today, modifiedBy: requester.id },
                 { where: { centerId, tiffinType: type, isActive: true, isDeleted: false, effectiveTo: null } }
@@ -84,7 +97,7 @@ const updatePricing = async ({ centerId, prices, requester }) => {
                 basePrice: incoming.basePrice,
                 defaultChapati: incoming.defaultChapati || 0,
                 pricePerChapati: incoming.pricePerChapati ?? 5.00,
-                isFixedPrice: type === 'dalrice' ? true : !!incoming.isFixedPrice,
+                isFixedPrice: !!incoming.isFixedPrice,
                 effectiveFrom: today,
                 effectiveTo: null,
                 isActive: true,
