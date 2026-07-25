@@ -1,4 +1,5 @@
 const { TiffinEntry, Approval } = require('../models')
+const { sendNotification } = require('./notification.service')
 const ServiceError = require('../utils/ServiceError')
 
 const getPendingApprovals = async ({ centerId, page = 1, limit = 10 }) => {
@@ -55,6 +56,21 @@ const reviewEntry = async ({ entryId, action, reason, requester }) => {
         reason: reason || '',
         createdBy: requester.id,
     })
+
+    const title = action === 'approved' ? 'Tiffin Approved ✅' : 'Tiffin Rejected ❌'
+    const body = action === 'approved'
+        ? `Your ${entry.tiffinType} Tiffin (${entry.shift}) request has been approved`
+        : `Your ${entry.tiffinType} Tiffin (${entry.shift}) request was rejected`
+
+    sendNotification({
+        userId: entry.userId,
+        type: 'tiffin_status_update',
+        title,
+        body,
+        entryId: entry.id,
+        centerId: entry.centerId,
+        data: { type: 'TIFFIN_STATUS_UPDATE', entryId: entry.id, status: action, reason: reason || '' }
+    }).catch(err => console.error('Failed to send push notification:', err))
 
     return entry
 }

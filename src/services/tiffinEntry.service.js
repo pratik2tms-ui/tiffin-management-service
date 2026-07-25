@@ -1,4 +1,5 @@
-const { TiffinEntry, Pricing, User } = require('../models')
+const { TiffinEntry, Pricing, User, TiffinCenter } = require('../models')
+const { sendNotification } = require('./notification.service')
 const ServiceError = require('../utils/ServiceError')
 const calculateAmount = require('../utils/calculateAmount')
 const { Op } = require('sequelize')
@@ -69,6 +70,22 @@ const createTiffinEntry = async ({ userId, date, shift, type, chapatiCount, note
         approvedAt: status === 'approved' ? new Date() : null,
         createdBy: requester.id,
     })
+
+    if (requester.role === 'user') {
+        const center = await TiffinCenter.findByPk(centerId)
+
+        if (center && center.ownerId) {
+            sendNotification({
+                userId: center.ownerId,
+                type: 'new_tiffin_request',
+                title: 'New Tiffin Request',
+                body: `${targetUser.name} requested ${type} Tiffin (${shift || 'morning'})`,
+                entryId: entry.id,
+                centerId: center.id,
+                data: { type: 'NEW_TIFFIN_REQUEST', entryId: entry.id, userId: targetUser.id, tiffinType: type, shift: shift || 'morning' }
+            }).catch(err => console.error('Failed to send push notification:', err))
+        }
+    }
 
     return entry
 }

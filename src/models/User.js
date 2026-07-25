@@ -32,6 +32,8 @@ User.associate = (models) => {
     User.belongsTo(models.TiffinCenter, { foreignKey: 'centerId', as: 'center' })
     User.hasMany(models.TiffinEntry, { foreignKey: 'userId', as: 'tiffinEntries' })
     User.hasMany(models.Payment, { foreignKey: 'userId', as: 'payments' })
+    User.hasMany(models.DeviceToken, { foreignKey: 'userId', as: 'deviceTokens' })
+    User.hasMany(models.Notification, { foreignKey: 'userId', as: 'notifications' })
 }
 
 module.exports = User
