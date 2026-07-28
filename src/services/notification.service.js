@@ -20,7 +20,7 @@ const sendNotification = async ({ userId, type, title, body, data = {}, entryId 
         } else {
             try {
                 const tokens = devices.map(d => d.fcmToken)
-                
+
                 // FCM data values must be strings
                 const stringifiedData = Object.fromEntries(
                     Object.entries(data).map(([k, v]) => [k, String(v)])
@@ -56,7 +56,7 @@ const sendNotification = async ({ userId, type, title, body, data = {}, entryId 
 const listNotifications = async ({ userId, page = 1, limit = 20 }) => {
     const offset = (page - 1) * limit
     const { rows, count } = await Notification.findAndCountAll({
-        where: { userId },
+        where: { userId, isSeen: false },
         order: [['createdAt', 'DESC']],
         limit: parseInt(limit),
         offset: parseInt(offset),
