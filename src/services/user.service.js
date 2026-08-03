@@ -82,11 +82,16 @@ const createUser = async ({ name, username, password, phone, centerId, role, req
 
     const passwordHash = await bcrypt.hash(password, 10)
 
+    let formattedPhone = phone || null
+    if (phone && /^\d{10}$/.test(phone)) {
+        formattedPhone = `+91 ${phone}`
+    }
+
     const user = await User.create({
         name,
         username,
         passwordHash,
-        phone: phone || null,
+        phone: formattedPhone,
         centerId: centerId || null,
         role: role || 'user',
         avatar: name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),

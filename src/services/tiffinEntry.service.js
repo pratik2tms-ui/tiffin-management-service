@@ -152,8 +152,60 @@ const listTiffinEntries = async ({ userId, centerId, month, status, shift, page 
     }
 }
 
+const updateTiffinEntry = async (id, { userId, date, shift, type, chapatiCount, status, note, requester }) => {
+    const entry = await TiffinEntry.findByPk(id)
+    if (!entry) {
+        throw new ServiceError('NOT_FOUND', 'Tiffin entry not found', 404)
+    }
+
+    if (requester.role === 'user') {
+        throw new ServiceError('UNAUTHORIZED', 'Users cannot update tiffin entries', 403)
+    }
+
+    const targetUserId = userId || entry.userId
+    const targetDate = date || entry.entryDate
+    const targetType = type || entry.tiffinType
+    const targetChapatiCount = chapatiCount !== undefined ? chapatiCount : entry.chapatiCount
+
+    const targetUser = await User.findByPk(targetUserId)
+    if (!targetUser) {
+        throw new ServiceError('NOT_FOUND', 'Customer not found', 404)
+    }
+
+    const centerId = targetUser.centerId
+    const pricing = await Pricing.findOne({
+        where: { centerId, tiffinType: targetType, isActive: true, isDeleted: false },
+    })
+    if (!pricing) {
+        throw new ServiceError('NOT_FOUND', 'No active pricing found for this tiffin type', 404)
+    }
+
+    const amount = calculateAmount(pricing, targetType, targetChapatiCount || 0)
+
+    const updateData = {
+        userId: targetUserId,
+        entryDate: targetDate,
+        shift: shift || entry.shift,
+        tiffinType: targetType,
+        chapatiCount: targetChapatiCount || 0,
+        amount,
+        status: status || entry.status,
+        note: note !== undefined ? note : entry.note,
+        pricingId: pricing.id,
+    }
+
+    if (updateData.status === 'approved' && entry.status !== 'approved') {
+        updateData.approvedBy = requester.id
+        updateData.approvedAt = new Date()
+    }
+
+    await entry.update(updateData)
+    return entry
+}
+
 module.exports = {
     createTiffinEntry,
     createNoTiffinEntry,
     listTiffinEntries,
+    updateTiffinEntry,
 }

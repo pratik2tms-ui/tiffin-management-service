@@ -46,4 +46,20 @@ const getTiffinEntries = async (req, res) => {
     }
 }
 
-module.exports = { addTiffin, markNoTiffin, getTiffinEntries }
+const updateTiffin = async (req, res) => {
+    try {
+        const entry = await tiffinEntryService.updateTiffinEntry(req.params.id, {
+            ...req.body,
+            requester: req.user,
+        })
+        return success(res, entry, null, 200)
+    } catch (err) {
+        if (err instanceof tiffinEntryService.ServiceError) {
+            return error(res, err.code, err.message, err.statusCode)
+        }
+        console.error('Update tiffin error:', err)
+        return error(res, 'SERVER_ERROR', 'Could not update tiffin entry', 500)
+    }
+}
+
+module.exports = { addTiffin, markNoTiffin, getTiffinEntries, updateTiffin }

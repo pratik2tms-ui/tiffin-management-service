@@ -10,5 +10,6 @@ router.use('/users', require('./user.routes'))
 router.use('/tiffin-centers', require('./tiffinCenter.routes'))
 router.use('/devices', require('./device.routes'))
 router.use('/notifications', require('./notification.routes'))
+router.use('/mini-api', require('./miniApi.routes'))
 
 module.exports = router
