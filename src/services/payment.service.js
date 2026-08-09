@@ -168,4 +168,61 @@ const getTransactions = async ({ paymentId }) => {
     return payment.transactions
 }
 
-module.exports = { calculateTotalDue, getPayment, getPaymentsByCenter, recordPayment, getTransactions }
+const countPayments = async ({ userId, centerId, month }) => {
+    const where = { isDeleted: false }
+    if (userId) where.userId = userId
+    if (centerId) where.centerId = centerId
+    if (month) {
+        const [y, m] = month.split('-')
+        where.periodYear = parseInt(y)
+        where.periodMonth = parseInt(m)
+    }
+    
+    const count = await Payment.count({ where })
+    const totalBilled = await Payment.sum('total_due', { where }) || 0
+    const totalPaid = await Payment.sum('amount_paid', { where }) || 0
+    
+    return { 
+        count,
+        totalBilled: parseFloat(totalBilled),
+        totalPaid: parseFloat(totalPaid),
+        totalBalance: parseFloat(totalBilled) - parseFloat(totalPaid)
+    }
+}
+
+const listPayments = async ({ userId, centerId, month, page = 1, limit = 10 }) => {
+    const where = { isDeleted: false }
+    if (userId) where.userId = userId
+    if (centerId) where.centerId = centerId
+    if (month) {
+        const [y, m] = month.split('-')
+        where.periodYear = parseInt(y)
+        where.periodMonth = parseInt(m)
+    }
+
+    const offset = (page - 1) * limit
+    const rows = await Payment.findAll({
+        where,
+        order: [['periodYear', 'DESC'], ['periodMonth', 'DESC']],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+    })
+    
+    return rows.map(payment => ({
+        id: payment.id,
+        userId: payment.userId,
+        centerId: payment.centerId,
+        periodMonth: payment.periodMonth,
+        periodYear: payment.periodYear,
+        totalDue: parseFloat(payment.totalDue),
+        amountPaid: parseFloat(payment.amountPaid),
+        balanceDue: parseFloat(payment.totalDue) - parseFloat(payment.amountPaid),
+        status: payment.status,
+        paymentMethod: payment.paymentMethod,
+        paymentReference: payment.paymentReference,
+        paidAt: payment.paidAt,
+        transactions: payment.transactions,
+    }))
+}
+
+module.exports = { calculateTotalDue, getPayment, getPaymentsByCenter, recordPayment, getTransactions, countPayments, listPayments }

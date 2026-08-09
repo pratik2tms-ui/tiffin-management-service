@@ -58,4 +58,30 @@ const getTransactions = async (req, res) => {
     }
 }
 
-module.exports = { getPayment, getPaymentsByCenter, recordPayment, getTransactions }
+const listPayments = async (req, res) => {
+    try {
+        const { centerId, month, page, limit } = req.query
+        const userId = req.user.role === 'user' ? req.user.id : req.query.userId
+        const rows = await paymentService.listPayments({ userId, centerId, month, page, limit })
+        return success(res, rows)
+    } catch (err) {
+        if (err instanceof ServiceError) return error(res, err.code, err.message, err.statusCode)
+        console.error('List payments error:', err)
+        return error(res, 'SERVER_ERROR', 'Could not fetch payments', 500)
+    }
+}
+
+const countPayments = async (req, res) => {
+    try {
+        const { centerId, month } = req.query
+        const userId = req.user.role === 'user' ? req.user.id : req.query.userId
+        const stats = await paymentService.countPayments({ userId, centerId, month })
+        return success(res, stats)
+    } catch (err) {
+        if (err instanceof ServiceError) return error(res, err.code, err.message, err.statusCode)
+        console.error('Count payments error:', err)
+        return error(res, 'SERVER_ERROR', 'Could not count payments', 500)
+    }
+}
+
+module.exports = { getPayment, getPaymentsByCenter, recordPayment, getTransactions, listPayments, countPayments }

@@ -152,6 +152,26 @@ const listTiffinEntries = async ({ userId, centerId, month, status, shift, page 
     }
 }
 
+const getTiffinEntryById = async (id, requester) => {
+    const entry = await TiffinEntry.findByPk(id)
+    if (!entry) throw new ServiceError('NOT_FOUND', 'Entry not found', 404)
+
+    if (requester.role === 'user' && entry.userId !== requester.id) {
+        throw new ServiceError('UNAUTHORIZED', 'Cannot access this entry', 403)
+    }
+
+    return {
+        id: entry.id,
+        userId: entry.userId,
+        date: entry.entryDate,
+        shift: entry.shift,
+        type: entry.tiffinType,
+        chapatiCount: entry.chapatiCount,
+        status: entry.status,
+        note: entry.note
+    }
+}
+
 const updateTiffinEntry = async (id, { userId, date, shift, type, chapatiCount, status, note, requester }) => {
     const entry = await TiffinEntry.findByPk(id)
     if (!entry) {
@@ -159,7 +179,12 @@ const updateTiffinEntry = async (id, { userId, date, shift, type, chapatiCount, 
     }
 
     if (requester.role === 'user') {
-        throw new ServiceError('UNAUTHORIZED', 'Users cannot update tiffin entries', 403)
+        if (entry.userId !== requester.id) {
+            throw new ServiceError('UNAUTHORIZED', 'Cannot update this entry', 403)
+        }
+        if (entry.status !== 'pending') {
+            throw new ServiceError('FORBIDDEN', 'Cannot update a processed tiffin', 403)
+        }
     }
 
     const targetUserId = userId || entry.userId
@@ -192,6 +217,7 @@ const updateTiffinEntry = async (id, { userId, date, shift, type, chapatiCount, 
         status: status || entry.status,
         note: note !== undefined ? note : entry.note,
         pricingId: pricing.id,
+        modifiedBy: requester.id,
     }
 
     if (updateData.status === 'approved' && entry.status !== 'approved') {
@@ -199,7 +225,24 @@ const updateTiffinEntry = async (id, { userId, date, shift, type, chapatiCount, 
         updateData.approvedAt = new Date()
     }
 
+    const oldDate = entry.entryDate
+    const oldShift = entry.shift
+
     await entry.update(updateData)
+
+    if (requester.role === 'center') {
+        if (oldDate !== updateData.entryDate || oldShift !== updateData.shift) {
+            await sendNotification({
+                userId: entry.userId,
+                type: 'TIFFIN_UPDATED',
+                title: 'Tiffin Entry Updated',
+                body: `Your tiffin entry for ${oldDate} (${oldShift}) has been updated to ${updateData.entryDate} (${updateData.shift}).`,
+                entryId: entry.id,
+                centerId: centerId,
+            }).catch(err => console.error('Error sending tiffin update notification:', err))
+        }
+    }
+
     return entry
 }
 
@@ -207,5 +250,6 @@ module.exports = {
     createTiffinEntry,
     createNoTiffinEntry,
     listTiffinEntries,
+    getTiffinEntryById,
     updateTiffinEntry,
 }
