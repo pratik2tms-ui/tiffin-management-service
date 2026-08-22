@@ -68,7 +68,21 @@ const getCurrentUser = async (userId) => {
     if (!user) {
         throw new ServiceError('NOT_FOUND', 'User not found', 404)
     }
-    return user
+
+    const userData = user.toJSON()
+
+    if (userData.role === 'center') {
+        const center = await TiffinCenter.findOne({
+            where: { owner_id: userData.id, is_deleted: false },
+            attributes: ['id'],
+            raw: true,
+        })
+        if (center) {
+            userData.centerId = center.id
+        }
+    }
+
+    return userData
 }
 
 module.exports = { loginUser, getCurrentUser }

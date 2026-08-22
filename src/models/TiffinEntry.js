@@ -11,7 +11,7 @@ TiffinEntry.init({
     pricingId: { type: DataTypes.BIGINT, field: 'pricing_id' },
     entryDate: { type: DataTypes.DATEONLY, field: 'entry_date', allowNull: false },
     shift: { type: DataTypes.ENUM('morning', 'night'), allowNull: false, defaultValue: 'morning' },
-    tiffinType: { type: DataTypes.ENUM('full', 'half', 'chapati', 'bhakari', 'dalrice'), field: 'tiffin_type', allowNull: false },
+    tiffinType: { type: DataTypes.STRING(50), field: 'tiffin_type', allowNull: false },
     chapatiCount: { type: DataTypes.SMALLINT, field: 'chapati_count', defaultValue: 0 },
     amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     status: { type: DataTypes.ENUM('pending', 'approved', 'rejected'), defaultValue: 'pending' },

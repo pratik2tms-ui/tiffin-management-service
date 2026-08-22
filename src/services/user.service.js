@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs')
+const { Op } = require('sequelize')
 const { User, TiffinEntry, Payment } = require('../models')
 const ServiceError = require('../utils/ServiceError')
 const { calculateTotalDue } = require('./payment.service')
@@ -8,10 +9,55 @@ const listUsers = async ({ centerId, role }) => {
     if (centerId) where.centerId = centerId
     if (role) where.role = role
 
-    return User.findAll({
+    const users = await User.findAll({
         where,
         attributes: ['id', 'name', 'username', 'centerId', 'avatar', 'phone', 'role', 'isActive'],
         order: [['name', 'ASC']],
+    })
+
+    if (users.length === 0) return []
+
+    const userIds = users.map(u => u.id)
+
+    const entries = await TiffinEntry.findAll({
+        where: { userId: { [Op.in]: userIds }, isDeleted: false }
+    })
+
+    const payments = await Payment.findAll({
+        where: { userId: { [Op.in]: userIds }, isDeleted: false }
+    })
+
+    return users.map(user => {
+        const userEntries = entries.filter(e => e.userId === user.id)
+        const approved = userEntries.filter(e => e.status === 'approved' && !e.isNoTiffin)
+        const pending = userEntries.filter(e => e.status === 'pending')
+
+        const totalAmount = approved.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+
+        const typeCounts = {}
+        approved.forEach(e => {
+            if (e.tiffinType) typeCounts[e.tiffinType] = (typeCounts[e.tiffinType] || 0) + 1
+        })
+        const favouriteType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+
+        const userPayments = payments.filter(p => p.userId === user.id)
+        const amountPaid = userPayments.reduce((s, p) => s + parseFloat(p.amountPaid || 0), 0)
+
+        const totalDue = totalAmount
+        const balanceDue = Math.max(0, totalDue - amountPaid)
+        const payStatus = amountPaid === 0 ? 'unpaid' : balanceDue <= 0 ? 'paid' : 'partial'
+
+        return {
+            ...user.toJSON(),
+            approved: approved.length,
+            pending: pending.length,
+            total: totalAmount,
+            favouriteType,
+            totalDue,
+            amountPaid,
+            balanceDue,
+            payStatus,
+        }
     })
 }
 

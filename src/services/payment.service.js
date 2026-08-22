@@ -169,18 +169,30 @@ const getTransactions = async ({ paymentId }) => {
 }
 
 const countPayments = async ({ userId, centerId, month }) => {
-    const where = { isDeleted: false }
-    if (userId) where.userId = userId
-    if (centerId) where.centerId = centerId
+    const paymentWhere = { isDeleted: false }
+    const tiffinWhere = { isDeleted: false, status: 'approved', isNoTiffin: false }
+
+    if (userId) {
+        paymentWhere.userId = userId
+        tiffinWhere.userId = userId
+    }
+    if (centerId) {
+        paymentWhere.centerId = centerId
+        tiffinWhere.centerId = centerId
+    }
     if (month) {
         const [y, m] = month.split('-')
-        where.periodYear = parseInt(y)
-        where.periodMonth = parseInt(m)
+        paymentWhere.periodYear = parseInt(y)
+        paymentWhere.periodMonth = parseInt(m)
+
+        const start = `${y}-${String(m).padStart(2, '0')}-01`
+        const end = new Date(parseInt(y), parseInt(m), 0).toISOString().split('T')[0]
+        tiffinWhere.entryDate = { [Op.between]: [start, end] }
     }
     
-    const count = await Payment.count({ where })
-    const totalBilled = await Payment.sum('total_due', { where }) || 0
-    const totalPaid = await Payment.sum('amount_paid', { where }) || 0
+    const count = await Payment.count({ where: paymentWhere })
+    const totalPaid = await Payment.sum('amount_paid', { where: paymentWhere }) || 0
+    const totalBilled = await TiffinEntry.sum('amount', { where: tiffinWhere }) || 0
     
     return { 
         count,

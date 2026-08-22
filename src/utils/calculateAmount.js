@@ -2,8 +2,8 @@ const calculateAmount = (pricing, tiffinType, chapatiCount) => {
     const hasChapatiField = pricing.defaultChapati !== null && pricing.defaultChapati !== undefined
         && pricing.defaultChapati !== 0
 
-    // No chapati/bhakari concept at all — one flat price for the whole item (e.g. Dal Rice)
-    if (tiffinType === 'dalrice' || !hasChapatiField) {
+    // No chapati/bhakari concept at all — one flat price for the whole item
+    if (pricing.isFixedPrice || !hasChapatiField) {
         return parseFloat(pricing.basePrice)
     }
 

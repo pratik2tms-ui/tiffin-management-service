@@ -51,6 +51,11 @@ const createTiffinEntry = async ({ userId, date, shift, type, chapatiCount, note
         throw new ServiceError('NOT_FOUND', 'No active pricing found for this tiffin type', 404)
     }
 
+    const dayOfWeek = new Date(date).getDay()
+    if (pricing.availableDays && pricing.availableDays[dayOfWeek.toString()] === false) {
+        throw new ServiceError('VALIDATION_ERROR', `This tiffin type is not available on ${new Date(date).toLocaleDateString('en-US', { weekday: 'long' })}`, 400)
+    }
+
     const amount = calculateAmount(pricing, type, chapatiCount || 0)
     const status = requester.role === 'center' ? 'approved' : 'pending'
 
@@ -105,7 +110,7 @@ const createNoTiffinEntry = async ({ userId, date, requester }) => {
         centerId: targetUser.centerId,
         entryDate: date,
         shift: 'morning',
-        tiffinType: 'full',
+        tiffinType: 'none',
         chapatiCount: 0,
         amount: 0,
         status: 'approved',
@@ -203,6 +208,11 @@ const updateTiffinEntry = async (id, { userId, date, shift, type, chapatiCount, 
     })
     if (!pricing) {
         throw new ServiceError('NOT_FOUND', 'No active pricing found for this tiffin type', 404)
+    }
+
+    const dayOfWeek = new Date(targetDate).getDay()
+    if (pricing.availableDays && pricing.availableDays[dayOfWeek.toString()] === false) {
+        throw new ServiceError('VALIDATION_ERROR', `This tiffin type is not available on ${new Date(targetDate).toLocaleDateString('en-US', { weekday: 'long' })}`, 400)
     }
 
     const amount = calculateAmount(pricing, targetType, targetChapatiCount || 0)
