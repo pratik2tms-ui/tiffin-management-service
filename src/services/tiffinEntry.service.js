@@ -100,10 +100,17 @@ const createNoTiffinEntry = async ({ userId, date, requester }) => {
         throw new ServiceError('VALIDATION_ERROR', 'userId and date are required', 400)
     }
 
+    // Date restriction only applies to customers
+    if (requester.role === 'user') {
+        validateCustomerDate(date)
+    }
+
     const targetUser = await User.findByPk(userId)
     if (!targetUser) {
         throw new ServiceError('NOT_FOUND', 'Customer not found', 404)
     }
+
+    const status = requester.role === 'center' ? 'approved' : 'pending'
 
     const entry = await TiffinEntry.create({
         userId,
@@ -113,12 +120,30 @@ const createNoTiffinEntry = async ({ userId, date, requester }) => {
         tiffinType: 'none',
         chapatiCount: 0,
         amount: 0,
-        status: 'approved',
+        status,
         addedByRole: requester.role,
         isNoTiffin: true,
         note: 'No tiffin',
+        approvedBy: status === 'approved' ? requester.id : null,
+        approvedAt: status === 'approved' ? new Date() : null,
         createdBy: requester.id,
     })
+
+    if (requester.role === 'user') {
+        const center = await TiffinCenter.findByPk(targetUser.centerId)
+
+        if (center && center.ownerId) {
+            sendNotification({
+                userId: center.ownerId,
+                type: 'new_tiffin_request',
+                title: 'No Tiffin Request',
+                body: `${targetUser.name} requested No Tiffin for ${date}`,
+                entryId: entry.id,
+                centerId: center.id,
+                data: { type: 'NEW_TIFFIN_REQUEST', entryId: entry.id, userId: targetUser.id, tiffinType: 'none', shift: 'morning' }
+            }).catch(err => console.error('Failed to send push notification:', err))
+        }
+    }
 
     return entry
 }
